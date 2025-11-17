@@ -1,6 +1,7 @@
 # pipeline.py
 from __future__ import annotations
 
+import os
 import time
 from typing import List, Tuple, Optional, Dict, Any
 
@@ -163,8 +164,15 @@ def _get_conversation_text(cfg: Dict[str, Any]) -> str:
 
 def _flush_pipeline_log(lines: List[str]) -> None:
     text = "\n".join(lines)
+
+    # Asegurar que la carpeta existe
+    log_dir = os.path.dirname(PIPELINE_LOG_PATH)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+
     with open(PIPELINE_LOG_PATH, "w", encoding="utf-8") as f:
         f.write(text)
+
 
 
 # =========================

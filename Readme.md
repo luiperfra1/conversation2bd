@@ -1,8 +1,9 @@
+
 # 🧠 Proyecto: Conversación → Tripletas → Cypher / SQL
 
-Este proyecto desarrolla un sistema capaz de transformar lenguaje natural del usuario en **tripletas semánticas**, que posteriormente se convierten en consultas **Cypher** (para Neo4j) o **SQL** (para SQLite).
+Este proyecto transforma lenguaje natural del usuario en **tripletas semánticas**, que posteriormente se convierten en consultas **Cypher** (Neo4j) o **SQL** (SQLite).
 
-El objetivo principal es crear una infraestructura que permita **estructurar y validar información derivada de conversaciones clínicas**, integrando procesamiento del lenguaje natural, generación de tripletas y persistencia en grafos o bases relacionales.
+El flujo completo puede operar **desde una conversación real** o **desde textos simulados**, y está especialmente diseñado para entornos clínicos y de interacción con personas mayores.
 
 ---
 
@@ -25,7 +26,7 @@ pip install -r requirements.txt
 
 ## 🔐 3. Configurar variables de entorno
 
-Crea un archivo `.env` en la raíz del proyecto con el siguiente contenido:
+Crea un archivo `.env` en la raíz del proyecto:
 
 ```bash
 # --- Neo4j ---
@@ -33,19 +34,14 @@ NEO4J_URI=***neo4j_url***
 NEO4J_USER=***neo4j_user***
 NEO4J_PASSWORD=***neo4j_password***
 
-# --- Backend LLM a usar por la app ---
-# Opciones: OPENAI o OLLAMA
+# --- Backend LLM ---
 LLAMUS_BACKEND=OPENAI
 LLAMUS_API_KEY=***tu_key***
-
-# Endpoints para el adapter
 LLAMUS_URL=***url_base_llamus***
 OLLAMA_URL=***url_base_ollama***
 
-# --- OpenAI API Base ---
-OPENAI_API_BASE=***url_base_openai***
-
-# --- OpenAI API Key ---
+# --- OPENAI ---
+OPENAI_API_BASE=***url***
 OPENAI_API_KEY=***tu_key***
 
 # --- Modelos ---
@@ -57,152 +53,215 @@ MODEL_CONV2TEXT=qwen2.5:32b
 USER_ID=***id_usuario***
 ```
 
-> ⚠️ **Importante:**  
-> No publiques este archivo ni lo incluyas en commits (`.gitignore` debe contener `.env`).
+---
+
+## 🗣️ 4. Módulo `conv` — Conversación → Paquetitos
+
+El módulo `conv/` implementa un asistente conversacional que:
+
+1. Detecta el nombre del usuario automáticamente.
+2. Mantiene un histórico interno.
+3. **Genera paquetitos** del tipo:
+
+```bash
+LLM: <último mensaje del asistente>
+user_<nombre>: <texto del usuario>
+```
+
+Estos paquetitos alimentan el pipeline.
+
+### ▶️ Ejecutar el conversador
+
+```bash
+python -m conv.main_conv
+```
+
+**Ejemplo real:**
+
+```bash
+Bot: Hola, ¿cómo te llamas?
+Tú: me llamo Luis
+[conv] Nombre detectado: Luis
+
+Tú: quiero hablar sobre mi día
+
+--- Último paquetito ---
+LLM: Mucho gusto, Luis. ¿En qué puedo ayudarte hoy?
+user_Luis: quiero hablar sobre mi día
+------------------------
+```
+
+### Funciones internas clave
+
+* `start_conversation()`
+* `conversation_turn()`
+* `chat_turn()`
+* `name_extractor()`
 
 ---
 
-## 🧠 4. Ejecutar el `text2triplet` (Texto Resumen → Tripletas)
+## 🧠 5. Módulo `text2triplets` — Texto → Tripletas
 
-Este módulo permite **extraer tripletas semánticas directamente desde texto libre**, utilizando un LLM o el extractor compatible con KG-Gen.
+Extrae tripletas desde texto libre usando LLM o KG-Gen.
 
 ```bash
 python -m text2triplets.main_kg --text TEXT3
 ```
 
-### Parámetros principales
+Flags principales (resumen):
 
-| Flag / Parámetro | Descripción | Valor por defecto | Ejemplo |
-|------------------|-------------|-------------------|----------|
-| `--mode` | Motor de extracción: `llm` o `kggen` | `llm` | `--mode kggen` |
-| `--text` | Texto predefinido en `texts.py` | `TEXT1` | `--text TEXT3` |
-| `--model` | Modelo LLM (sobrescribe `.env`) | Usa `.env` | `--model qwen2.5:14b` |
-| `--context` | Ontología o contexto aplicado | `DEFAULT_CONTEXT` | `--context ...` |
-| `--no-drop` | Muestra también tripletas inválidas | *Desactivado* | `--no-drop` |
-| `--sqlite-db` | Ruta del fichero SQLite | `./data/users/demo.sqlite` | `--sqlite-db data/test.sqlite` |
-| `--no-reset-log` | No limpiar la tabla de log al iniciar | *Desactivado* | `--no-reset-log` |
-| `--generate-report` | Generar informe SQL tras ejecución | *Desactivado* | `--generate-report` |
-| `--report-path` | Ruta del informe generado | *Automático* | `--report-path ./data/report.txt` |
-| `--report-sample-limit` | Número de filas por tabla en reporte | `15` | `--report-sample-limit 30` |
+| Flag                | Uso                    |
+| ------------------- | ---------------------- |
+| `--mode llm/kggen`  | Motor de extracción    |
+| `--text`            | Selección de texto     |
+| `--model`           | Modelo LLM             |
+| `--no-drop`         | No descartar inválidas |
+| `--generate-report` | Informe SQL            |
 
 ---
 
-## 🚀 5. Ejecutar el `triplets2bd` (Tripletas → Cypher / SQL)
-
-Transforma tripletas en sentencias **Cypher** o **SQL**, ejecutándolas en Neo4j o SQLite según configuración.
+## 🚀 6. Módulo `triplets2bd` — Tripletas → SQL / Cypher
 
 ```bash
 python -m triplets2bd.main_tripletas_bd
 ```
 
-### Flags disponibles
-
-| Flag / Parámetro | Descripción | Valor por defecto | Ejemplo |
-|------------------|-------------|-------------------|----------|
-| `--bd` | Backend de salida: `sql` o `neo4j` | `sql` | `--bd neo4j` |
-| `--sqlite-db` | Ruta del fichero SQLite | `./data/users/demo.sqlite` | `--sqlite-db ./data/test.sqlite` |
-| `--no-reset` | Evita resetear la BD | *Desactivado* | `--no-reset` |
-| `--no-reset-log` | Evita limpiar la tabla de log | *Desactivado* | `--no-reset-log` |
-| `--llm` | Forzar modo LLM para todas las tripletas | *Desactivado* | `--llm` |
-| `--no-llm` | Forzar modo determinista puro | *Desactivado* | `--no-llm` |
-| `--triplets-json` | Cargar tripletas desde JSON inline | `None` | `--triplets-json '[["Ana","padece","insomnio"]]'` |
-| `--triplets-file` | Cargar tripletas desde fichero | `None` | `--triplets-file ./data/tripletas.txt` |
-| `--generate-report` | Crear informe tras ejecutar SQL | *Desactivado* | `--generate-report` |
+Permite inyectar las tripletas en SQLite o Neo4j.
 
 ---
 
-## 🗣️ 6. Ejecutar el `conv2text` (Conversación → Resumen textual)
-
-Resume una conversación usuario-asistente en frases breves y explícitas, listas para el extractor de tripletas.
+## 🗣️ 7. Módulo `conv2text` — Conversación → Resumen semántico
 
 ```bash
 python -m conv2text.main_conv2text --text-key TEXT1
 ```
 
-### Flags principales
-
-| Flag / Parámetro | Descripción | Valor por defecto | Ejemplo |
-|------------------|-------------|-------------------|----------|
-| `--in` | Archivo de entrada con conversación | `-` (stdin) | `--in data/chat.txt` |
-| `--out` | Archivo de salida del resumen | *stdout* | `--out resumen.txt` |
-| `--text-key` | Texto predefinido (`texts.py`) | `None` | `--text-key TEXT3` |
-| `--max` | Número máximo de frases | `10` | `--max 8` |
-| `--temp` | Temperatura del modelo | `0.0` | `--temp 0.3` |
-| `--sqlite-db` | Ruta a la base de datos SQLite | `./data/users/demo.sqlite` | `--sqlite-db data/test.sqlite` |
-| `--no-reset-log` | No limpiar la tabla `log` antes de generar resumen | *Desactivado* | `--no-reset-log` |
-| `--generate-report` | Genera un informe tras ejecutar | *Desactivado* | `--generate-report` |
-| `--list-texts` | Lista textos disponibles y termina | *Desactivado* | `--list-texts` |
+Convierte una conversación en frases limpias y explícitas.
 
 ---
 
-## 🔄 7. Ejecutar el `pipeline` (Conversación → Resumen → Tripletas → BD)
+## 🔄 8. Pipelines del proyecto
 
-Ejecuta automáticamente todo el flujo de transformación y persistencia.
+Aquí viene la parte más importante: **cómo funciona realmente el proyecto**.
+
+## 🧩 Vista general del sistema de pipelines
+
+El proyecto usa **3 scripts**, cada uno con un propósito claro:
+
+| Script                           | Conversación | Resetea BD          | Imprime en consola   | Guarda en fichero                   | Uso                      |
+| -------------------------------- | ------------ | ------------------- | -------------------- | ----------------------------------- | ------------------------ |
+| **conversation_pipeline.py**     | Sí (conv/)   | Sí (solo al inicio) | Sí                   | Log interno via processing_pipeline | Flujo real completo      |
+| **processing_pipeline.py**       | No           | No                  | No                   | **Sí: `/pipelines/pipeline.txt`**   | Producción / integración |
+| **processing_pipeline_debug.py** | No           | Opcional            | **Sí, imprime TODO** | No                                  | Depuración exhaustiva    |
+
+---
+
+## 🔥 8.1 `conversation_pipeline.py` (El más importante)
+
+**Este es el que debes ejecutar para que todo funcione de forma automática.**
+Gestiona:
+
+✔ Conversación real
+✔ Generación de paquetitos
+✔ Envío del paquetito al pipeline
+✔ Reset inicial de BD
+✔ Ejecución completa hasta SQL/Neo4j
+
+### ▶️ Ejecutarlo
 
 ```bash
-python -m pipeline
+python -m conversation_pipeline
 ```
 
-### Comportamiento del pipeline
+Cuando hablas con el bot:
 
-1. **Reset al inicio:** limpia la tabla `log`, el dominio SQLite y Neo4j.  
-2. **Resumen automático:** usa `conv2text` si `"use_conv2text_for_extractor": True`.  
-3. **Extracción:** genera tripletas con el extractor (`text2triplet` o `kggen`).  
-4. **Inyección:** ejecuta `triplets2bd` con `reset=False` y `reset_log=False`.  
-5. **Salida:** muestra tiempos parciales y crea `data/users/demo_report.txt` (modo SQL).
-
-### Flags adicionales (si se ejecuta como script configurable)
-
-| Parámetro | Descripción | Valor por defecto | Ejemplo |
-|------------|-------------|-------------------|----------|
-| `--no-reset` | Desactiva el reset global inicial | *Activado* | `--no-reset` |
-| `--no-summary` | Omite la fase conv2text | *Desactivado* | `--no-summary` |
-| `--backend` | Forzar backend de salida (`sql` o `neo4j`) | `sql` | `--backend neo4j` |
-| `--mode` | Modo de BD (`deterministic`, `hybrid`, `llm`) | `deterministic` | `--mode hybrid` |
-| `--temp` | Temperatura del LLM en `conv2text` | `0.0` | `--temp 0.3` |
-
----
-
-## 🧩 8. Mapa general de comandos
-
-| Módulo | Descripción | Ejemplo |
-|--------|--------------|---------|
-| `conv2text` | Conversación → Resumen | `python -m conv2text.main_conv2text --text-key TEXT3` |
-| `text2triplets` | Texto → Tripletas | `python -m text2triplets.main_kg --text TEXT3` |
-| `triplets2bd` | Tripletas → BD (SQL / Neo4j) | `python -m triplets2bd.main_tripletas_bd --bd sql` |
-| `pipeline` | Flujo completo | `python -m pipeline` |
-
----
-
-## 🧠 9. Ejemplo de flujo completo
+1. El conversador genera un *paquetito*.
+2. El paquetito se envía automáticamente a `processing_pipeline.py`.
+3. Este guarda el resultado del pipeline en:
 
 ```bash
-py -3.12 -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
+/pipelines/pipeline.txt
+```
 
-python -m conv2text.main_conv2text --text-key TEXT3
-python -m text2triplets.main_kg --text TEXT3 --generate-report
-python -m triplets2bd.main_tripletas_bd --bd sql
-python -m pipeline
+👉 **Esto evita saturar la consola** cuando se envían muchos paquetitos seguidos.
 
-type data/users/demo_report.txt
+---
+
+## 🧩 8.2 `processing_pipeline.py` (Pipeline silencioso)
+
+Este es el pipeline real que procesa el texto (resumen → tripletas → BD), pero:
+
+* **No imprime nada por consola**
+* **No resetea la base de datos**
+* Guarda todo en:
+
+```bash
+pipelines/pipeline.txt
+```
+
+### Se usa automáticamente desde
+
+🡆 `conversation_pipeline.py`
+
+### Úsalo cuando
+
+* Quieras procesar decenas de paquetitos sin ruido.
+* Necesites un pipeline “de producción”.
+
+---
+
+## 🧪 8.3 `processing_pipeline_debug.py` (Modo depuración total)
+
+Es igual que el pipeline principal, pero:
+
+* Ouiere **debug completo**
+* Imprime todo en consola:
+
+  * resumen conv2text
+  * tripletas
+  * scripts SQL/Cypher
+  * leftovers
+  * tiempos
+* Puede resetear dominios si `CONFIG["reset"] = True`
+
+### ▶️ Ejecutar
+
+```bash
+python -m processing_pipeline_debug
+```
+
+### Cuándo usarlo
+
+* Para depurar resultados del extractor.
+* Para ver exactamente qué entra y sale.
+* Para probar la app sin iniciar conversación (**modo simulado**).
+
+---
+
+## 🧠 9. Ejemplo completo de flujo
+
+```bash
+# 1. Conversación real
+python -m conversation_pipeline
+
+# 2. Revisar el log del pipeline silencioso
+type pipelines/pipeline.txt
+
+# 3. Debug manual sin conversación
+python -m processing_pipeline_debug
 ```
 
 ---
 
 ## 🧾 10. Notas adicionales
 
-- El `pipeline` no resetea durante la inyección, solo al inicio.  
-- `conv2text`, `text2triplet` y `triplets2bd` pueden ejecutarse por separado.  
-- `make_sqlite_report.py` genera informes directamente desde una BD SQLite:
-  python -m triplets2bd.make_sqlite_report data/users/demo.sqlite -o data/users/demo_report.txt
-- Compatible con **Neo4j ≥5.x** y **Python 3.12+**.  
-- El fichero `.env` define los endpoints y modelos activos.  
-- Todos los scripts imprimen tiempos y logs en consola.
+* `conversation_pipeline.py` realiza el único reset seguro del proyecto.
+* `processing_pipeline.py` existe para no saturar la consola cuando llegan muchos paquetitos.
+* `processing_pipeline_debug.py` es tu herramienta de inspección completa.
+* Todos los módulos son independientes y se pueden usar de forma aislada.
 
 ---
 
 ## 📍 11. Créditos
 
-Desarrollado como parte del entorno de investigación en la **Universidad de Sevilla**, integrando modelos LLM, generación de tripletas y persistencia en grafos y bases de datos relacionales.
+Proyecto desarrollado dentro del entorno de investigación de la **Universidad de Sevilla**, integrando modelos LLM, generación de tripletas, resúmenes semánticos y persistencia en grafos/bases de datos para aplicaciones clínicas y asistenciales.
