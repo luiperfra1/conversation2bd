@@ -2,35 +2,54 @@
 
 Este proyecto implementa un **pipeline conversacional completo** capaz de transformar una conversación natural con un LLM en **información estructurada**, almacenada en **SQLite** o **Neo4j**.
 
-Su objetivo es extraer de forma fiable información clínica y de hábitos personales procedente de diálogos con personas mayores, garantizando coherencia, validación y una estructura de datos completamente cerrada.
+El objetivo es extraer de forma fiable **información clínica o de hábitos personales** procedente de conversaciones reales, garantizando:
+
+* Coherencia interna
+* Seguridad semántica  
+* Dominio cerrado
+* Validación estricta
+* Persistencia en BD sin ruido
 
 ---
 
-## 🧩 Funcionamiento global del sistema
+## 🧠 Funcionamiento global del sistema
 
-El sistema opera como un **ETL conversacional** compuesto por cuatro capas encadenadas:
+El sistema opera como un **ETL conversacional**, compuesto por **4 capas** que se ejecutan siempre en el mismo orden:
+
+```bash
+CONVERSACIÓN → RESUMEN → TRIPLETAS → BASE DE DATOS
+```
+
+---
 
 ### 1) Conversación con LLM → Paquetitos (`conv/`)
 
-El usuario habla con un LLM.  
-Cada turno genera un paquetito del estilo:
+El usuario habla con un LLM.
+
+Cada turno genera un **paquetito** del estilo:
 
 ```bash
-LLM: <pregunta o mensaje del asistente>
-user_<nombre>: <respuesta del usuario>
+LLM: <mensaje del asistente>
+user_<nombre>: <mensaje del usuario>
 ```
 
 El módulo:
 
-- Detecta automáticamente el nombre
-- Mantiene el historial
-- Produce los paquetitos que alimentan todo el pipeline
+* Detecta el nombre del usuario automáticamente
+* Mantiene el estado conversacional
+* Genera paquetitos que alimentan el pipeline principal
+
+**Ejecutar:**
+
+```bash
+python -m conv.main_conv
+```
 
 ---
 
 ### 2) Paquetitos → Resumen semántico (`conv2text/`)
 
-El paquetito se transforma en frases explícitas y normalizadas, diseñadas para extraer información útil.
+Convierte esos paquetitos en frases breves totalmente explícitas.
 
 **Ejemplo:**
 
@@ -40,38 +59,43 @@ Luis toma lorazepam desde 2024-03.
 Luis duerme mal desde hace dos semanas.
 ```
 
-Estas frases están pensadas para ser procesadas por el extractor de tripletas.
+Este resumen se usa como entrada para el extractor de tripletas.
 
 ---
 
-### 3) Resumen → Tripletas (`text2triplets/`)
+### 3) Resumen → Tripletas (`text2triplets/` → `main_kg.py`)
 
-El módulo convierte el texto en tripletas del tipo:
+Convierte el texto en tripletas con formato:
 
 ```bash
 (sujeto, predicado, objeto)
 ```
 
-Las tripletas **deben encajar obligatoriamente** en la estructura fija del dominio.  
-Cualquier elemento que no sea compatible se descarta o se registra como *leftover*.
+Las tripletas se validan estrictamente contra la estructura fija del dominio.
+Tripletas no válidas → descartadas o marcadas como leftover.
 
 ---
 
 ### 4) Tripletas → Base de Datos (`triplets2bd/`)
 
-La última capa toma las tripletas válidas y genera:
+Genera scripts SQL o Cypher según el backend elegido:
 
-- **SQL** (SQLite)
-- **Cypher** (Neo4j)
+* `--bd sql`
+* `--bd neo4j`
 
-Inyectando solo nodos y relaciones existentes en la estructura fija del dominio.
+El módulo:
+
+* Limpia la BD (si no se usa `--no-reset`)
+* Limpia el log (si no se usa `--no-reset-log`)
+* Inserta entidades y relaciones válidas
+* Genera scripts deterministas y scripts LLM (modo híbrido)
 
 ---
 
-## 🧩 Estructura fija del dominio
+## 🧩 Estructura fija del dominio (OBLIGATORIA)
 
-El dominio del proyecto es **cerrado**.  
-No se permiten entidades ni relaciones fuera de lo definido aquí.
+El dominio del proyecto es **cerrado y obligatorio**.
+No se permiten nodos nuevos, relaciones nuevas ni campos nuevos.
 
 ### 🗂️ TABLAS PRINCIPALES
 
@@ -113,9 +137,8 @@ persona_padece_sintoma(persona_id, sintoma_id)
 persona_realiza_actividad(persona_id, actividad_id)
 ```
 
-✔ El pipeline **solo inyecta** información dentro de esta estructura  
-✔ No se crean nodos ni campos adicionales  
-✔ Las tripletas deben mapear de forma estricta a estas tablas o relaciones
+✔ El pipeline SOLO inyecta información dentro de esta estructura  
+✔ Las tripletas deben mapear estrictamente a estas tablas
 
 ---
 
@@ -134,45 +157,36 @@ py -3.12 -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 3. Configurar variables de entorno
-
-Crea un archivo `.env` en la raíz del proyecto:
+### 3. Crear archivo `.env`
 
 ```bash
-# --- Neo4j ---
-NEO4J_URI=***neo4j_url***
-NEO4J_USER=***neo4j_user***
-NEO4J_PASSWORD=***neo4j_password***
+# Neo4j
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=***
 
-# --- Backend LLM ---
+# Backend LLM
 LLAMUS_BACKEND=OPENAI
-LLAMUS_API_KEY=***tu_key***
-LLAMUS_URL=***url_base_llamus***
-OLLAMA_URL=***url_base_ollama***
+LLAMUS_API_KEY=***
+LLAMUS_URL=***
+OLLAMA_URL=***
 
-# --- OPENAI ---
-OPENAI_API_BASE=***url***
-OPENAI_API_KEY=***tu_key***
+# OPENAI
+OPENAI_API_BASE=***
+OPENAI_API_KEY=***
 
-# --- Modelos ---
+# Modelos
 MODEL_TRIPLETAS_CYPHER=qwen2.5:32b
 MODEL_KG_GEN=openai/qwen2.5:14b
 MODEL_CONV2TEXT=qwen2.5:32b
 MODEL_CONV=qwen2.5:32b
-
 ```
 
 ---
 
-## 🗣️ Módulos
+## 🗣️ Módulos del Pipeline
 
-### 4. Módulo `conv` — Conversación → Paquetitos
-
-El módulo gestiona toda la conversación con el asistente:
-
-- Detecta el nombre del usuario
-- Mantiene el historial
-- Genera paquetitos listos para el pipeline
+### `conv` — Conversación → Paquetitos
 
 **Ejecutar:**
 
@@ -180,134 +194,117 @@ El módulo gestiona toda la conversación con el asistente:
 python -m conv.main_conv
 ```
 
-**Ejemplo:**
-
-```bash
-Bot: Hola, ¿cómo te llamas?
-Tú: me llamo Luis
-[conv] Nombre detectado: Luis
-
---- Último paquetito ---
-LLM: Mucho gusto, Luis. ¿En qué puedo ayudarte hoy?
-user_Luis: quiero hablar sobre mi día
-------------------------
-```
-
-**Funciones clave:**
-
-- `start_conversation()`
-- `conversation_turn()`
-- `chat_turn()`
-- `name_extractor()`
-
 ---
 
-### 5. Módulo `conv2text` — Conversación → Resumen
+### `conv2text` — Conversación → Resumen
 
-Convierte los paquetitos en texto limpio.
+Basado en `main_conv2text.py`:
+
+**Ejecutar:**
 
 ```bash
 python -m conv2text.main_conv2text --text-key TEXT1
 ```
 
----
-
-### 6. Módulo `text2triplets` — Texto → Tripletas
-
-```bash
-python -m text2triplets.main_kg --text TEXT3
-```
-
-**Flags principales:**
+#### 🚩 Flags Completas (conv2text)
 
 | Flag | Uso |
 |------|-----|
-| `--mode llm/kggen` | Motor de extracción |
-| `--text` | Selección de texto |
-| `--model` | Modelo LLM |
-| `--no-drop` | No descartar inválidas |
-| `--generate-report` | Informe SQL |
+| `--in RUTA` | Entrada manual (si no usas `--text-key`) |
+| `--out RUTA` | Guarda el resumen |
+| `--max N` | Máx. frases del resumen |
+| `--temp X` | Temperatura del LLM |
+| `--text-key CLAVE` | Usa texto de conv2text/texts.py |
+| `--list-texts` | Lista textos disponibles |
+| `--sqlite-db RUTA` | Base SQLite para log |
+| `--no-reset-log` | No limpiar tabla `log` |
+| `--generate-report` | Genera informe SQLite |
+| `--report-out` | Ruta del informe |
+| `--report-limit` | Nº filas por tabla |
 
 ---
 
-### 7. Módulo `triplets2bd` — Tripletas → SQL / Cypher
+### `text2triplets` — Texto → Tripletas
+
+Basado en `main_kg.py`.
+
+**Ejecutar:**
 
 ```bash
-python -m triplets2bd.main_tripletas_bd
+python -m text2triplets.main_kg --text TEXT1
 ```
 
-Inyecta las tripletas en SQLite o en Neo4j.
+#### 🚩 Flags Completas (main_kg.py)
+
+| Flag | Uso |
+|------|-----|
+| `--mode llm` | Extractor LLM |
+| `--mode kggen` | Extractor KG-Base |
+| `--text TEXTX` | Selecciona texto de texts.py |
+| `--model` | Sobrescribe el modelo |
+| `--context` | Ontología/Contexto |
+| `--no-drop` | No descartar inválidas |
+| `--sqlite-db RUTA` | Log de tripletas |
+| `--no-reset-log` | No limpiar log |
+| `--generate-report` | Genera informe SQLite |
+| `--report-path` | Ruta del informe |
+| `--report-sample-limit N` | Nº filas por tabla |
+
+---
+
+### `triplets2bd` — Tripletas → SQL / Cypher
+
+Basado en `main_tripletas_bd.py`.
+
+**Ejecutar:**
+
+```bash
+python -m triplets2bd.main_tripletas_bd --bd sql
+```
+
+#### 🚩 Flags Completas
+
+| Flag | Uso |
+|------|-----|
+| `--bd sql` | SQLite |
+| `--bd neo4j` | Neo4j |
+| `--llm` | Solo LLM |
+| `--no-llm` | Solo determinista |
+| (sin flags) | Híbrido |
+| `--no-reset` | No resetear BD |
+| `--no-reset-log` | No limpiar tabla log |
+| `--triplets-json STR` | Tripletas como JSON string |
+| `--triplets-file RUTA` | Tripletas desde fichero |
 
 ---
 
 ## 🔄 Pipelines del proyecto
 
-El proyecto contiene tres pipelines distintos:
+### Tabla comparativa
 
-| Script | Conversación | Resetea BD | Imprime | Guarda en archivo | Uso |
-|--------|--------------|------------|---------|-------------------|-----|
-| **conversation_pipeline.py** | Sí | Sí (inicio) | Sí | Sí (`/pipelines/pipeline.txt`) | Flujo real completo |
-| **processing_pipeline.py** | No | No | No | Sí (`/pipelines/pipeline.txt`) | Producción / integración |
-| **processing_pipeline_debug.py** | No | Opcional | Sí | No | Depuración compleja |
-
----
-
-### 🔥 8.1 `conversation_pipeline.py`
-
-El script principal:
-
-- Mantiene conversación real
-- Genera paquetitos
-- Llama al pipeline silencioso
-- Resetea las bases al inicio
-
-**Ejecutar:**
-
-```bash
-python -m conversation_pipeline
-```
+| Script | Conversación | Resetea BD | Imprime | Guarda archivo | Uso |
+|--------|--------------|------------|---------|----------------|-----|
+| `conversation_pipeline.py` | Sí | Sí | Sí | Sí (`pipelines/pipeline.txt`) | Flujo real |
+| `processing_pipeline.py` | No | No | No | Sí | Producción |
+| `processing_pipeline_debug.py` | No | Opcional | Sí | No | Depuración |
 
 ---
 
-### 🧩 8.2 `processing_pipeline.py`
-
-Pipeline silencioso que procesa:
-
-1. conv2text
-2. text2triplets  
-3. triplets2bd
-
-Guarda todo en:
-
-```bash
-pipelines/pipeline.txt
-```
-
----
-
-### 🧪 8.3 `processing_pipeline_debug.py`
-
-Imprime TODO: resumen, tripletas, scripts SQL/Cypher, leftovers, tiempos…
-
-Ideal para depurar.
-
-**Ejecutar:**
-
-```bash
-python -m processing_pipeline_debug
-```
-
----
-
-## 🧠 Ejemplo completo de flujo
+## 🧠 Ejemplo de uso completo
 
 ```bash
 # 1. Conversación real
 python -m conversation_pipeline
 
-# 2. Ver resultados del pipeline
+# 2. Ver salida del pipeline
 type pipelines/pipeline.txt
 
-# 3. Debug manual sin conversación
+# 3. Debug completo manual
 python -m processing_pipeline_debug
 ```
+
+---
+
+## 📍 Créditos
+
+Proyecto desarrollado en la **Universidad de Sevilla**
