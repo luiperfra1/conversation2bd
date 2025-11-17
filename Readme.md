@@ -179,12 +179,9 @@ OPENAI_API_KEY=***
 MODEL_TRIPLETAS_CYPHER=qwen2.5:32b
 MODEL_KG_GEN=openai/qwen2.5:14b
 MODEL_CONV2TEXT=qwen2.5:32b
-<<<<<<< HEAD
-MODEL_CONV=qwen2.5:32b
-=======
 MODEL_CONV=hermes3:8b
 
->>>>>>> ae617057ccefd64382eaea3af6ecb4d0c56908b2
+
 ```
 
 ---
