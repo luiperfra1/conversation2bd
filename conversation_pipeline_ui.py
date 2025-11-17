@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import Dict, Any, Optional
 
 import os
+import threading
+import queue
 
 import streamlit as st
 
@@ -9,7 +11,7 @@ import streamlit as st
 from conv.engine import start_conversation, conversation_turn, ConvState
 
 # --- Pipeline principal (SIN resets ni prints, escribe en pipelines/pipeline.txt) ---
-from processing_pipeline import CONFIG as PIPE_CFG, main as run_pipeline
+from utils.processing_pipeline import CONFIG as PIPE_CFG, main as run_pipeline
 
 # --- Utils para resetear dominios y logs (solo aquí) ---
 from utils.reset import reset_domain_sqlite, reset_domain_neo4j
@@ -69,13 +71,14 @@ def _run_pipeline_with_text(texto: str, debug: bool = False) -> None:
     PIPE_CFG["TEXT_KEY"] = None
     PIPE_CFG["TEXT_RAW"] = texto
 
+    # Importante: esto es BLOQUEANTE, por eso lo llamamos desde un hilo aparte.
     if debug:
-        st.write("=== Enviando paquetito al PIPELINE ===")
+        print("=== Enviando paquetito al PIPELINE ===")
 
     run_pipeline()
 
     if debug:
-        st.write("=== PIPELINE completado ===")
+        print("=== PIPELINE completado ===")
 
 
 class ConversationPipelineApp:
@@ -84,17 +87,22 @@ class ConversationPipelineApp:
 
     - Gestiona el estado de la conversación (conv.engine).
     - En cada turno de usuario genera la respuesta del bot.
-    - Si hay 'paquetito', lo envía a processing_pipeline (que loguea en pipelines/pipeline.txt).
+    - Si hay 'paquetito', lo envía a processing_pipeline (que loguea en pipelines/pipeline.txt)
+      mediante una cola procesada en segundo plano.
     """
 
     def __init__(self, *, do_reset: bool = True, debug: bool = False) -> None:
         """
         :param do_reset: si True, resetea SQLite + Neo4j + log al iniciar la sesión.
-        :param debug: si True, muestra algunos mensajes en la interfaz.
+        :param debug: si True, muestra algunos mensajes (logs en consola / algunos en UI).
         """
         self.debug = debug
         self.state: Optional[ConvState] = None
         self._greeting: Optional[str] = None
+
+        # --- Cola y worker de pipeline ---
+        self._pipeline_queue: queue.Queue[str] = queue.Queue()
+        self._start_pipeline_worker()
 
         if do_reset:
             sqlite_path = PIPE_CFG.get("sqlite_db_path", "./data/users/demo.sqlite")
@@ -104,6 +112,35 @@ class ConversationPipelineApp:
         greeting, state = start_conversation()
         self._greeting = greeting
         self.state = state
+
+    def _start_pipeline_worker(self) -> None:
+        """
+        Lanza un hilo en segundo plano que consume la cola de textos
+        y ejecuta el pipeline de forma secuencial (pero no bloquea la conversación).
+        """
+        def worker() -> None:
+            while True:
+                texto = self._pipeline_queue.get()  # bloquea hasta recibir algo
+                try:
+                    _run_pipeline_with_text(texto, debug=self.debug)
+                except Exception as e:
+                    # Mejor usar print y no st.write en hilos secundarios
+                    print(f"[pipeline_worker] Error procesando paquetito: {e!r}")
+                finally:
+                    self._pipeline_queue.task_done()
+
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+        if self.debug:
+            print("[pipeline_worker] Hilo de pipeline iniciado.")
+
+    def enqueue_pipeline(self, texto: str) -> None:
+        """
+        Mete un nuevo texto en la cola para que lo procese el worker.
+        """
+        if self.debug:
+            print("[pipeline] Encolando nuevo paquetito.")
+        self._pipeline_queue.put(texto)
 
     @property
     def initial_message(self) -> str:
@@ -132,12 +169,14 @@ class ConversationPipelineApp:
         )
         self.state = new_state
 
-        # Si hay paquetito (a partir del 2º turno), lo mandamos al pipeline
+        # Si hay paquetito (a partir del 2º turno), lo mandamos al pipeline en SEGUNDO PLANO
         if paquetito is not None:
             if self.debug:
                 st.write("---- Paquetito generado ----")
                 st.code(paquetito)
-            _run_pipeline_with_text(paquetito, debug=self.debug)
+
+            # En lugar de ejecutar el pipeline aquí (bloqueante), lo encolamos
+            self.enqueue_pipeline(paquetito)
 
         return {
             "reply": reply,
