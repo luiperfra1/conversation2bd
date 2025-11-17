@@ -163,15 +163,31 @@ def _get_conversation_text(cfg: Dict[str, Any]) -> str:
 
 
 def _flush_pipeline_log(lines: List[str]) -> None:
-    text = "\n".join(lines)
+    """
+    Reglas:
+    - Si NO existe la carpeta ./pipelines → se crea.
+    - Si NO existe pipeline.txt → se crea vacío.
+    - Si SÍ existe pipeline.txt → se borra y se vuelve a crear limpio.
+    - Después de esa limpieza, siempre se escribe en modo append.
+    """
 
-    # Asegurar que la carpeta existe
+    text = "\n".join(lines)
+    if not text.endswith("\n"):
+        text += "\n"
+
+    # 1. Asegurar existencia de carpeta
     log_dir = os.path.dirname(PIPELINE_LOG_PATH)
-    if log_dir:
+    if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
 
-    with open(PIPELINE_LOG_PATH, "w", encoding="utf-8") as f:
+    # 2. Si el archivo existe → BORRARLO
+    if os.path.exists(PIPELINE_LOG_PATH):
+        os.remove(PIPELINE_LOG_PATH)
+
+    # 3. Crear el archivo limpio y escribir en modo append
+    with open(PIPELINE_LOG_PATH, "a", encoding="utf-8") as f:
         f.write(text)
+
 
 
 
