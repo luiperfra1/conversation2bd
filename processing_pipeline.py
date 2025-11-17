@@ -246,7 +246,7 @@ def main() -> None:
         extractor=cfg["extractor_mode"],
         model=cfg["extractor_model"],
         drop_invalid=cfg["drop_invalid"],
-        print_triplets=False,  # no queremos prints en consola
+        print_triplets=True,  # no queremos prints en consola
         sqlite_db_path=cfg["sqlite_db_path"],
     )
     extract_time_s = time.perf_counter() - t0

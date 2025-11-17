@@ -18,3 +18,4 @@ types-requests>=2.32.0.20241016
 pytest>=8.2.0
 
 kg-gen
+streamlit
