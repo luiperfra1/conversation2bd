@@ -24,7 +24,7 @@ def to_title_name(s: Optional[str]) -> Optional[str]:
 
 def parse_age(obj: str) -> Optional[int]:
     o = obj.strip().lower()
-    m = re.search(r"(\d{1,3})\s*años?", o)
+    m = re.search(r"(\d{1,3})\s*a[nñ]os?", o)
     if m:
         return int(m.group(1))
     if o.isdigit():
@@ -85,11 +85,11 @@ def partition_triplets_strict(triplets: List[Triplet]) -> Tuple[List[Triplet], L
         if v_l in ALLOWED_PROP:
             supported.append((s_l, v_l, o_l))
             continue
-        if v_l == "tiene":
+        if v_l == "edad":
             if _is_age_text(o_l):
                 supported.append((s_l, v_l, o_l))
             else:
-                leftovers.append(((s_l, v_l, o_l), "tiene_sin_edad"))
+                leftovers.append(((s_l, v_l, o_l), "edad_sin_edad"))
             continue
         leftovers.append(((s_l, v_l, o_l), "verbo_no_permitido"))
 

@@ -25,9 +25,8 @@ CONFIG = {
     "source": "text",
     "TEXT_KEY": None,
     "TEXT_RAW": """
-LLM: ¿Sigues alguna rutina de ejercicio o alimentación?
-user_ernesto: Intento comer sano entre semana, aunque los fines de semana suelo comer fuera. Practico yoga una vez a la semana y a veces salgo en bici con un amigo los domingos, pero no siempre.
-He pensado en apuntarme a natación, aunque me cuesta organizarme.
+LLM: ¿Que edad tienes?
+user_ernesto: Tengo 45 años
 """,
     "print_conv_summary": True,
     "conv_summary_max_sentences": 10,

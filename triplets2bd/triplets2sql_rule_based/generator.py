@@ -20,8 +20,10 @@ def upsert_from_triplets(triplets: List[Triplet]) -> Tuple[List[str], List[str]]
         s_l, v_l, o_l = s.strip().lower(), v.strip().lower(), o.strip().lower()
 
         # Edad
-        if v_l == 'tiene':
+        if v_l == 'edad':
+            print(1)
             age = parse_age(o_l)
+            print(age)
             if age is not None:
                 p = col.persona_by_name(s_l)
                 p.set('edad', age)

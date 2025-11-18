@@ -66,7 +66,7 @@ def partition_triplets_strict(triplets: List[Triplet]) -> Tuple[List[Triplet], L
         if v_l in ALLOWED_REL or v_l in ALLOWED_PROP:
             supported.append((s_l, v_l, o_l))
             continue
-        if v_l == "tiene":
+        if v_l == "edad":
             if _is_age_text(o_l):
                 supported.append((s_l, v_l, o_l))
             else:

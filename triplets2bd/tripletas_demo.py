@@ -129,3 +129,8 @@ RAW_TRIPLES_DEMO4: List[Tuple[str, str, str]] = [
 RAW_TRIPLES_DEMO5: List[Tuple[str, str, str]] = [
     ("Ana García", "juega", "futbol"),
     ]
+
+RAW_TRIPLES_DEMO6: List[Tuple[str, str, str]] = [
+    ("Ana", "edad", "45 anos"),
+    ("Ana", "tiene", "45 anos"),
+    ]

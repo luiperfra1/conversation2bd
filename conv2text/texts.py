@@ -121,4 +121,7 @@ user_ernesto: Solo que me gustaría dormir mejor sin depender de la medicación.
 Cuando logro dormir bien y mantenerme activo, mi estado de ánimo mejora mucho.
 """,
 
+ "TEXT17": """LLM: ¿Que edad tienes?
+user_ernesto: Tengo 45 años
+""",
 }

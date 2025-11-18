@@ -40,7 +40,7 @@ DEFAULT_CONTEXT = """Eres un extractor de tripletas en ESPAÑOL. Devuelve EXCLUS
 - medicacion(nombre comercial o genérico)
 
 # RELACIONES ENTRE NODOS (SOLO ESTAS)
-- ("<Persona>", "tiene", "<edad en formato 'NN años'>")
+- ("<Persona>", "edad", "<edad en formato 'NN años'>")
 - ("<Persona>", "realiza", "<Nombre Actividad>")
 - ("<Persona>", "padece", "<Nombre Síntoma>")
 - ("<Persona>", "toma", "<Nombre Medicación>")
@@ -66,7 +66,7 @@ DEFAULT_CONTEXT = """Eres un extractor de tripletas en ESPAÑOL. Devuelve EXCLUS
 - No inventes categoria o frencuencia si no están en el texto.
 
 # EJEMPLOS VÁLIDOS
-("Ana García", "tiene", "45 años")
+("Ana García", "edad", "45 años")
 ("Ana García", "realiza", "yoga")
 ("yoga", "frecuencia", "varias_por_semana")
 ("mareos", "inicio", "15/01/2023")

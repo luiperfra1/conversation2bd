@@ -34,7 +34,7 @@ if __name__ == "__main__":
     triplets = (
         load_triplets_from_json_str(args.triplets_json) if args.triplets_json else
         load_triplets_from_file(args.triplets_file) if args.triplets_file else
-        RAW_TRIPLES_DEMO4
+        RAW_TRIPLES_DEMO6
     )
 
     opts = EngineOptions(
